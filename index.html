@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://sxhjkexpeneepwplhsli.supabase.co; form-action 'none'; base-uri 'none'">
+<title>Set your password</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --fg:#1b1f24; --muted:#5b6470; --line:#d5dae1; --accent:#2457d6; --ok:#1f7a3f; --err:#b3261e; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#111418; --card:#1a1f25; --fg:#e8ebef; --muted:#9aa4b1; --line:#323a44; --accent:#7aa2ff; --ok:#5cc489; --err:#ff8a80; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:420px; margin:10vh auto; padding:0 16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:24px; }
+  h1 { font-size:1.3rem; margin:0 0 8px; }
+  p { margin:0 0 16px; color:var(--muted); }
+  label { display:block; font-weight:600; margin:12px 0 4px; }
+  input { width:100%; padding:10px; font:inherit; color:var(--fg); background:var(--bg); border:1px solid var(--line); border-radius:6px; }
+  button { margin-top:18px; width:100%; padding:11px; font:inherit; font-weight:600; color:#fff; background:var(--accent); border:0; border-radius:6px; cursor:pointer; }
+  button:disabled { opacity:.6; cursor:default; }
+  .msg { margin-top:14px; font-weight:600; }
+  .msg.err { color:var(--err); }
+  .msg.ok { color:var(--ok); }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <h1 id="title">Set your password</h1>
+    <p id="intro">Choose a password of at least 12 characters.</p>
+    <form id="form" hidden novalidate>
+      <label for="pw1">New password</label>
+      <input id="pw1" type="password" autocomplete="new-password" minlength="12" required>
+      <label for="pw2">Confirm password</label>
+      <input id="pw2" type="password" autocomplete="new-password" minlength="12" required>
+      <button id="submit" type="submit">Set password</button>
+    </form>
+    <div id="msg" class="msg" role="status" aria-live="polite"></div>
+  </div>
+</main>
+<script>
+(function () {
+  "use strict";
+  var SUPABASE_URL = "https://sxhjkexpeneepwplhsli.supabase.co";
+  var PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4aGprZXhwZW5lZXB3cGxoc2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUyODMwMTcsImV4cCI6MjExMDg1OTAxN30.IoHC7dpXJpnIesxSDdpPflMYqZLHejBWM497arMWKfc";
+  var MIN_LEN = 12;
+  var EXPIRED_MSG = "This link has expired; ask AV to resend.";
+
+  // Merge params from the query string and the URL fragment (fragment wins).
+  function parseParams(hash, search) {
+    var out = {};
+    [search || "", hash || ""].forEach(function (part) {
+      part = part.replace(/^[?#]/, "");
+      if (!part) return;
+      new URLSearchParams(part).forEach(function (v, k) { out[k] = v; });
+    });
+    return out;
+  }
+
+  // Decide what the page should do from the parsed params.
+  function classify(p) {
+    if (p.error || p.error_code || p.error_description) {
+      return { state: "error", message: EXPIRED_MSG };
+    }
+    if (p.access_token && (p.type === "invite" || p.type === "recovery" || !p.type)) {
+      return { state: "ready", token: p.access_token, type: p.type || "" };
+    }
+    if (p.access_token) {
+      return { state: "error", message: "This link is not a password link." };
+    }
+    return { state: "error", message: "No sign-in token found. Open the link from your invite or password-reset email." };
+  }
+
+  function validate(pw1, pw2) {
+    if (!pw1 || pw1.length < MIN_LEN) return "Password must be at least " + MIN_LEN + " characters.";
+    if (pw1 !== pw2) return "The two passwords do not match.";
+    return null;
+  }
+
+  // PUT {base}/auth/v1/user. Resolves {ok:true} or {ok:false, message}.
+  function setPassword(fetchImpl, base, key, token, password) {
+    return fetchImpl(base + "/auth/v1/user", {
+      method: "PUT",
+      headers: { "apikey": key, "Authorization": "Bearer " + token, "Content-Type": "application/json" },
+      body: JSON.stringify({ password: password }),
+      referrerPolicy: "no-referrer",
+      credentials: "omit",
+      cache: "no-store"
+    }).then(function (res) {
+      if (res.ok) return { ok: true };
+      return res.text().then(function (t) {
+        var body = {};
+        try { body = JSON.parse(t); } catch (e) {}
+        if (res.status === 401 || res.status === 403) return { ok: false, message: EXPIRED_MSG };
+        var m = body.msg || body.message || body.error_description || body.error || ("Request failed (" + res.status + ").");
+        return { ok: false, message: m };
+      });
+    }, function () {
+      return { ok: false, message: "Network error. Check your connection and try again." };
+    });
+  }
+
+  var api = { parseParams: parseParams, classify: classify, validate: validate, setPassword: setPassword, EXPIRED_MSG: EXPIRED_MSG, MIN_LEN: MIN_LEN };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  if (typeof document === "undefined") return;
+
+  function clearUrl() {
+    try { history.replaceState(null, "", location.pathname); } catch (e) {}
+  }
+
+  var $ = function (id) { return document.getElementById(id); };
+  var msg = $("msg"), form = $("form"), btn = $("submit");
+  function show(text, kind) { msg.textContent = text; msg.className = "msg " + (kind || ""); }
+
+  var c = classify(parseParams(location.hash, location.search));
+  if (c.state !== "ready") {
+    $("intro").hidden = true;
+    show(c.message, "err");
+    clearUrl();
+    return;
+  }
+  var token = c.token;
+  if (c.type === "invite") $("title").textContent = "Welcome. Set your password";
+  form.hidden = false;
+  $("pw1").focus();
+
+  form.addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var err = validate($("pw1").value, $("pw2").value);
+    if (err) { show(err, "err"); return; }
+    btn.disabled = true;
+    show("Saving...", "");
+    setPassword(window.fetch.bind(window), SUPABASE_URL, PUBLISHABLE_KEY, token, $("pw1").value).then(function (r) {
+      if (r.ok) {
+        token = null;
+        clearUrl();
+        form.hidden = true;
+        $("intro").hidden = true;
+        $("title").textContent = "Done";
+        show("Password set. You can close this page.", "ok");
+      } else {
+        btn.disabled = false;
+        show(r.message, "err");
+        if (r.message === EXPIRED_MSG) { form.hidden = true; token = null; clearUrl(); }
+      }
+    });
+  });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,357 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://sxhjkexpeneepwplhsli.supabase.co; form-action 'none'; base-uri 'none'">
+<title>Agent channel viewer</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#fff; --fg:#1b1f24; --muted:#5b6470; --line:#d5dae1; --accent:#2457d6; --ok:#1f7a3f; --err:#b3261e; --sel:#e8eefc; }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg:#111418; --card:#1a1f25; --fg:#e8ebef; --muted:#9aa4b1; --line:#323a44; --accent:#7aa2ff; --ok:#5cc489; --err:#ff8a80; --sel:#24304a; }
+  }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
+  main { max-width:1100px; margin:4vh auto; padding:0 16px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:20px; }
+  #signin { max-width:420px; margin:6vh auto 0; }
+  h1 { font-size:1.3rem; margin:0 0 8px; }
+  h2 { font-size:1.05rem; margin:0 0 10px; }
+  p { margin:0 0 16px; color:var(--muted); }
+  label { display:block; font-weight:600; margin:12px 0 4px; }
+  input { width:100%; padding:10px; font:inherit; color:var(--fg); background:var(--bg); border:1px solid var(--line); border-radius:6px; }
+  button { font:inherit; font-weight:600; border-radius:6px; cursor:pointer; }
+  .primary { margin-top:18px; width:100%; padding:11px; color:#fff; background:var(--accent); border:0; }
+  .plain { padding:6px 12px; color:var(--fg); background:transparent; border:1px solid var(--line); }
+  button:disabled { opacity:.6; cursor:default; }
+  .msg { margin-top:14px; font-weight:600; }
+  .msg.err { color:var(--err); }
+  .msg.ok { color:var(--ok); }
+  .bar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
+  .bar .who { color:var(--muted); }
+  .cols { display:grid; grid-template-columns:260px 1fr; gap:14px; align-items:start; }
+  @media (max-width: 720px) { .cols { grid-template-columns:1fr; } }
+  #rooms { list-style:none; margin:0; padding:0; }
+  #rooms li { margin:0 0 6px; }
+  .room { width:100%; text-align:left; padding:8px 10px; color:var(--fg); background:transparent; border:1px solid var(--line); font-weight:400; }
+  .room.sel { background:var(--sel); border-color:var(--accent); }
+  .room .rid { display:block; font-weight:600; overflow-wrap:anywhere; }
+  .room .rmeta { display:block; color:var(--muted); font-size:.85rem; overflow-wrap:anywhere; }
+  .status { color:var(--muted); font-size:.85rem; margin:0 0 10px; }
+  .m { border-top:1px solid var(--line); padding:10px 0; }
+  .m:first-child { border-top:0; }
+  .meta { display:flex; flex-wrap:wrap; gap:4px 12px; font-size:.85rem; color:var(--muted); margin-bottom:6px; }
+  .meta .k { font-weight:600; color:var(--fg); }
+  pre { margin:0; padding:8px 10px; background:var(--bg); border:1px solid var(--line); border-radius:6px; white-space:pre-wrap; overflow-wrap:anywhere; font:13px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace; }
+  details summary { cursor:pointer; color:var(--accent); font-size:.85rem; margin-bottom:4px; }
+  [hidden] { display:none !important; }
+</style>
+</head>
+<body>
+<main>
+  <div id="signin" class="card">
+    <h1>Agent channel viewer</h1>
+    <p>Read-only. Sign in with your viewer login.</p>
+    <form id="signinForm" novalidate>
+      <label for="email">Email</label>
+      <input id="email" type="email" autocomplete="username" required>
+      <label for="password">Password</label>
+      <input id="password" type="password" autocomplete="current-password" required>
+      <button id="signinBtn" class="primary" type="submit">Sign in</button>
+    </form>
+    <div id="msg" class="msg" role="status" aria-live="polite"></div>
+  </div>
+  <div id="app" hidden>
+    <div class="bar">
+      <h1>Agent channel viewer</h1>
+      <span><span id="who" class="who"></span> <button id="signout" class="plain" type="button">Sign out</button></span>
+    </div>
+    <div class="cols">
+      <div class="card">
+        <h2>Rooms</h2>
+        <ul id="rooms"></ul>
+        <p id="noRooms" hidden>No rooms yet.</p>
+      </div>
+      <div class="card">
+        <h2 id="roomTitle">Pick a room</h2>
+        <div id="roomStatus" class="status" role="status" aria-live="polite"></div>
+        <div id="messages"></div>
+      </div>
+    </div>
+  </div>
+</main>
+<script>
+(function () {
+  "use strict";
+  var SUPABASE_URL = "https://sxhjkexpeneepwplhsli.supabase.co";
+  var PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4aGprZXhwZW5lZXB3cGxoc2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUyODMwMTcsImV4cCI6MjExMDg1OTAxN30.IoHC7dpXJpnIesxSDdpPflMYqZLHejBWM497arMWKfc";
+  var POLL_MS = 15000;
+  var LONG_CHARS = 800, LONG_LINES = 15;
+  var NOT_VIEWER_MSG = "This login is not a viewer login";
+  var WRONG_MSG = "Email or password is wrong.";
+  var EXPIRED_MSG = "Your session has expired. Sign in again.";
+  var NET_MSG = "Network error. Check your connection and try again.";
+  // The only RPCs this page may call. All are read-only.
+  var READ_CALLS = { ch_whoami: true, ch_mirror_rooms: true, ch_mirror_read: true };
+
+  function fetchOpts(headers, body) {
+    return { method: "POST", headers: headers, body: body, referrerPolicy: "no-referrer", credentials: "omit", cache: "no-store" };
+  }
+
+  function parse(t) { try { return JSON.parse(t); } catch (e) { return undefined; } }
+
+  // POST {base}/auth/v1/token?grant_type=password. Resolves {ok:true, token} or {ok:false, message}.
+  function signIn(fetchImpl, base, key, email, password) {
+    if (!email || !password) return Promise.resolve({ ok: false, message: "Enter your email and password.", local: true });
+    return fetchImpl(base + "/auth/v1/token?grant_type=password",
+        fetchOpts({ "apikey": key, "Content-Type": "application/json" }, JSON.stringify({ email: email, password: password }))
+    ).then(function (res) {
+      return res.text().then(function (t) {
+        var body = parse(t) || {};
+        if (res.ok && body.access_token) return { ok: true, token: body.access_token };
+        if (res.status === 400) return { ok: false, message: WRONG_MSG };
+        var m = body.msg || body.message || body.error_description || body.error || ("Sign-in failed (" + res.status + ").");
+        return { ok: false, message: m };
+      });
+    }, function () { return { ok: false, message: NET_MSG }; });
+  }
+
+  // POST {base}/rest/v1/rpc/{name}. Read calls only. Resolves {ok:true, data} or
+  // {ok:false, code?, expired?, message}. A refusal is HTTP 400 {"message": "<code>", "details": ...}.
+  function rpc(fetchImpl, base, key, token, name, args) {
+    if (!Object.prototype.hasOwnProperty.call(READ_CALLS, name)) {
+      return Promise.resolve({ ok: false, message: "Not a read call: " + name, local: true });
+    }
+    return fetchImpl(base + "/rest/v1/rpc/" + name,
+        fetchOpts({ "apikey": key, "Authorization": "Bearer " + token, "Content-Type": "application/json",
+                    "Accept": "application/json" }, JSON.stringify(args || {}))
+    ).then(function (res) {
+      return res.text().then(function (t) {
+        var body = parse(t);
+        if (res.ok) return { ok: true, data: body };
+        if (res.status === 401) return { ok: false, expired: true, message: EXPIRED_MSG };
+        body = body || {};
+        var code = typeof body.message === "string" ? body.message : null;
+        var m = code ? "Refused: " + code + (body.details && body.details !== code ? " (" + body.details + ")" : "")
+                     : ("Request failed (" + res.status + ").");
+        return { ok: false, code: code, message: m };
+      });
+    }, function () { return { ok: false, message: NET_MSG }; });
+  }
+
+  // ch_whoami returns {"viewer": owner} for a viewer login, {"login", "owner", "rooms"} for an agent.
+  function isViewer(who) {
+    return !!who && typeof who === "object" && !Array.isArray(who) &&
+           typeof who.viewer === "string" && who.viewer !== "" && !("login" in who);
+  }
+
+  // Sign in, then check the login is a viewer. Resolves {ok:true, token, owner} or {ok:false, message}.
+  function signInViewer(fetchImpl, base, key, email, password) {
+    return signIn(fetchImpl, base, key, email, password).then(function (s) {
+      if (!s.ok) return s;
+      return rpc(fetchImpl, base, key, s.token, "ch_whoami", {}).then(function (r) {
+        if (r.ok && isViewer(r.data)) return { ok: true, token: s.token, owner: r.data.viewer };
+        if (r.ok || r.code === "unknown-login") return { ok: false, message: NOT_VIEWER_MSG };
+        return { ok: false, message: r.message };
+      });
+    });
+  }
+
+  function listRooms(fetchImpl, base, key, token) {
+    return rpc(fetchImpl, base, key, token, "ch_mirror_rooms", {}).then(function (r) {
+      if (r.ok && !Array.isArray(r.data)) return { ok: false, message: "Unexpected reply from ch_mirror_rooms." };
+      return r;
+    });
+  }
+
+  function readRoom(fetchImpl, base, key, token, room, since) {
+    return rpc(fetchImpl, base, key, token, "ch_mirror_read", { room: room, since: since || 0 }).then(function (r) {
+      if (r.ok && !Array.isArray(r.data)) return { ok: false, message: "Unexpected reply from ch_mirror_read." };
+      return r;
+    });
+  }
+
+  function isLong(body) {
+    body = body == null ? "" : String(body);
+    return body.length > LONG_CHARS || body.split("\n").length > LONG_LINES;
+  }
+
+  // Header fields for one message, as [label, text] pairs (null fields left out).
+  function messageMeta(m) {
+    var out = [["#", String(m.seq)], ["time", String(m.server_time)],
+               ["from", String(m.sender) + (m.owner ? " (" + m.owner + ")" : "")], ["intent", String(m.intent)]];
+    if (m.to_login != null) out.push(["to", String(m.to_login)]);
+    if (m.reply_to != null) out.push(["reply to", "#" + m.reply_to]);
+    if (m.supersedes != null) out.push(["supersedes", "#" + m.supersedes]);
+    if (m.item != null) out.push(["item", String(m.item)]);
+    return out;
+  }
+
+  function roomLine(r) {
+    var parts = [String(r.kind)];
+    if (Array.isArray(r.members)) parts.push(r.members.join(", "));
+    if (Array.isArray(r.head)) parts.push("head #" + r.head[0]);
+    if (r.blind_open) parts.push("blind pass open");
+    return parts.join(" · ");
+  }
+
+  // DOM builders. Text goes in only through textContent, never as HTML.
+  function elt(doc, tag, cls, text) {
+    var e = doc.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function renderMessage(doc, m) {
+    var art = elt(doc, "article", "m");
+    art.setAttribute("data-seq", String(m.seq));
+    var meta = elt(doc, "div", "meta");
+    messageMeta(m).forEach(function (kv) {
+      var s = elt(doc, "span", null);
+      s.appendChild(elt(doc, "span", "k", kv[0] === "#" ? "#" : kv[0] + " "));
+      s.appendChild(doc.createTextNode(kv[1]));
+      meta.appendChild(s);
+    });
+    art.appendChild(meta);
+    var body = m.body == null ? "" : String(m.body);
+    var pre = elt(doc, "pre", null, body);
+    if (isLong(body)) {
+      var d = elt(doc, "details", null);
+      var lines = body.split("\n").length;
+      d.appendChild(elt(doc, "summary", null, "Long body (" + body.length + " characters, " + lines + " lines): show"));
+      d.appendChild(pre);
+      art.appendChild(d);
+    } else {
+      art.appendChild(pre);
+    }
+    return art;
+  }
+
+  var api = { signIn: signIn, rpc: rpc, isViewer: isViewer, signInViewer: signInViewer, listRooms: listRooms,
+              readRoom: readRoom, isLong: isLong, messageMeta: messageMeta, roomLine: roomLine,
+              renderMessage: renderMessage, READ_CALLS: READ_CALLS, POLL_MS: POLL_MS,
+              NOT_VIEWER_MSG: NOT_VIEWER_MSG, WRONG_MSG: WRONG_MSG, EXPIRED_MSG: EXPIRED_MSG };
+  if (typeof module !== "undefined" && module.exports) module.exports = api;
+  if (typeof document === "undefined") return;
+
+  // ---------- page ----------
+  var $ = function (id) { return document.getElementById(id); };
+  var F = window.fetch.bind(window);
+  var msg = $("msg");
+  // Session state lives only in these variables: nothing is stored in the browser.
+  var token = null, owner = null, room = null, lastSeq = 0, timer = null, busy = false, gen = 0;
+
+  function show(text, kind) { msg.textContent = text; msg.className = "msg " + (kind || ""); }
+  function clear(e) { while (e.firstChild) e.removeChild(e.firstChild); }
+
+  function stopPolling() { if (timer !== null) { window.clearInterval(timer); timer = null; } }
+
+  function signOut(text, kind) {
+    stopPolling();
+    gen++;
+    token = null; owner = null; room = null; lastSeq = 0; busy = false;
+    clear($("rooms")); clear($("messages"));
+    $("who").textContent = ""; $("roomTitle").textContent = "Pick a room"; $("roomStatus").textContent = "";
+    $("password").value = "";
+    $("app").hidden = true;
+    $("signin").hidden = false;
+    $("signinBtn").disabled = false;
+    show(text || "", kind);
+  }
+
+  function failed(r, where) {
+    if (r.expired) { signOut(EXPIRED_MSG, "err"); return; }
+    where.textContent = r.message;
+  }
+
+  function stamp() {
+    var d = new Date();
+    function p(n) { return (n < 10 ? "0" : "") + n; }
+    return p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
+  }
+
+  function append(list) {
+    var box = $("messages");
+    list.forEach(function (m) {
+      if (typeof m.seq !== "number" || m.seq <= lastSeq) return;
+      box.appendChild(renderMessage(document, m));
+      lastSeq = m.seq;
+    });
+  }
+
+  function poll() {
+    if (busy || token === null || room === null) return;
+    busy = true;
+    var g = gen, t = token, r0 = room;
+    readRoom(F, SUPABASE_URL, PUBLISHABLE_KEY, t, r0, lastSeq).then(function (r) {
+      if (g !== gen) return;
+      busy = false;
+      if (!r.ok) { failed(r, $("roomStatus")); return; }
+      append(r.data);
+      $("roomStatus").textContent = "Checked " + stamp() + ". New messages are fetched every 15 seconds.";
+    });
+  }
+
+  function openRoom(id, btn) {
+    stopPolling();
+    gen++;
+    busy = false;
+    room = id; lastSeq = 0;
+    var all = $("rooms").getElementsByTagName("button");
+    for (var i = 0; i < all.length; i++) all[i].className = "room";
+    if (btn) btn.className = "room sel";
+    $("roomTitle").textContent = id;
+    $("roomStatus").textContent = "Loading...";
+    clear($("messages"));
+    poll();
+    timer = window.setInterval(poll, POLL_MS);
+  }
+
+  function showRooms(list) {
+    var ul = $("rooms");
+    clear(ul);
+    $("noRooms").hidden = list.length > 0;
+    list.forEach(function (r) {
+      var li = document.createElement("li");
+      var b = elt(document, "button", "room");
+      b.type = "button";
+      b.appendChild(elt(document, "span", "rid", String(r.room)));
+      b.appendChild(elt(document, "span", "rmeta", roomLine(r)));
+      b.addEventListener("click", function () { openRoom(String(r.room), b); });
+      li.appendChild(b);
+      ul.appendChild(li);
+    });
+  }
+
+  $("signout").addEventListener("click", function () { signOut("Signed out.", "ok"); });
+
+  $("signinForm").addEventListener("submit", function (ev) {
+    ev.preventDefault();
+    var btn = $("signinBtn");
+    btn.disabled = true;
+    show("Signing in...", "");
+    var pw = $("password").value;
+    $("password").value = "";
+    var g = gen;
+    signInViewer(F, SUPABASE_URL, PUBLISHABLE_KEY, $("email").value.trim(), pw).then(function (s) {
+      pw = null;
+      if (g !== gen) return;
+      if (!s.ok) { btn.disabled = false; show(s.message, "err"); return; }
+      token = s.token; owner = s.owner;
+      return listRooms(F, SUPABASE_URL, PUBLISHABLE_KEY, token).then(function (r) {
+        if (g !== gen) return;
+        if (!r.ok) { if (r.expired) { signOut(EXPIRED_MSG, "err"); return; } token = null; btn.disabled = false; show(r.message, "err"); return; }
+        show("", "");
+        $("signin").hidden = true;
+        $("app").hidden = false;
+        $("who").textContent = "Viewer for " + owner + ".";
+        showRooms(r.data);
+      });
+    });
+  });
+})();
+</script>
+</body>
+</html>

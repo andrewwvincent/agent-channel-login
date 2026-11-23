@@ -39,6 +39,18 @@
       <input id="pw2" type="password" autocomplete="new-password" minlength="12" required>
       <button id="submit" type="submit">Set password</button>
     </form>
+    <p id="tempNote" hidden>Got an invite or reset link? Open it from the email instead.</p>
+    <form id="tempForm" hidden novalidate>
+      <label for="tEmail">Email</label>
+      <input id="tEmail" type="email" autocomplete="username" required>
+      <label for="tCur">Current (temporary) password</label>
+      <input id="tCur" type="password" autocomplete="current-password" required>
+      <label for="tPw1">New password</label>
+      <input id="tPw1" type="password" autocomplete="new-password" minlength="12" required>
+      <label for="tPw2">Confirm new password</label>
+      <input id="tPw2" type="password" autocomplete="new-password" minlength="12" required>
+      <button id="tSubmit" type="submit">Change password</button>
+    </form>
     <div id="msg" class="msg" role="status" aria-live="polite"></div>
   </div>
 </main>
@@ -72,7 +84,7 @@
     if (p.access_token) {
       return { state: "error", message: "This link is not a password link." };
     }
-    return { state: "error", message: "No sign-in token found. Open the link from your invite or password-reset email." };
+    return { state: "temp" };
   }
 
   function validate(pw1, pw2) {
@@ -104,7 +116,48 @@
     });
   }
 
-  var api = { parseParams: parseParams, classify: classify, validate: validate, setPassword: setPassword, EXPIRED_MSG: EXPIRED_MSG, MIN_LEN: MIN_LEN };
+  var WRONG_MSG = "Email or temporary password is wrong.";
+  var CHANGED_MSG = "Password changed. You can close this page.";
+
+  // POST {base}/auth/v1/token?grant_type=password. Resolves {ok:true, token} or {ok:false, message}.
+  function signIn(fetchImpl, base, key, email, password) {
+    return fetchImpl(base + "/auth/v1/token?grant_type=password", {
+      method: "POST",
+      headers: { "apikey": key, "Content-Type": "application/json" },
+      body: JSON.stringify({ email: email, password: password }),
+      referrerPolicy: "no-referrer",
+      credentials: "omit",
+      cache: "no-store"
+    }).then(function (res) {
+      return res.text().then(function (t) {
+        var body = {};
+        try { body = JSON.parse(t); } catch (e) {}
+        if (res.ok && body.access_token) return { ok: true, token: body.access_token };
+        if (res.status === 400) return { ok: false, message: WRONG_MSG };
+        var m = body.msg || body.message || body.error_description || body.error || ("Sign-in failed (" + res.status + ").");
+        return { ok: false, message: m };
+      });
+    }, function () {
+      return { ok: false, message: "Network error. Check your connection and try again." };
+    });
+  }
+
+  // Validate, sign in with the temporary password, then set the new one.
+  function changeTemporaryPassword(fetchImpl, base, key, email, current, pw1, pw2) {
+    var err = !email || !current ? "Enter your email and temporary password." : validate(pw1, pw2);
+    if (err) return Promise.resolve({ ok: false, message: err, local: true });
+    return signIn(fetchImpl, base, key, email, current).then(function (s) {
+      if (!s.ok) return s;
+      return setPassword(fetchImpl, base, key, s.token, pw1).then(function (r) {
+        if (!r.ok && r.message === EXPIRED_MSG) return { ok: false, message: "Sign-in expired. Please try again." };
+        return r;
+      });
+    });
+  }
+
+  var api = { parseParams: parseParams, classify: classify, validate: validate, setPassword: setPassword,
+              signIn: signIn, changeTemporaryPassword: changeTemporaryPassword,
+              EXPIRED_MSG: EXPIRED_MSG, WRONG_MSG: WRONG_MSG, CHANGED_MSG: CHANGED_MSG, MIN_LEN: MIN_LEN };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (typeof document === "undefined") return;
 
@@ -117,6 +170,34 @@
   function show(text, kind) { msg.textContent = text; msg.className = "msg " + (kind || ""); }
 
   var c = classify(parseParams(location.hash, location.search));
+  if (c.state === "temp") {
+    var tForm = $("tempForm"), tBtn = $("tSubmit");
+    $("title").textContent = "Change a temporary password";
+    $("intro").textContent = "Sign in with the temporary password you were given, then choose a new one of at least 12 characters.";
+    $("tempNote").hidden = false;
+    tForm.hidden = false;
+    clearUrl();
+    tForm.addEventListener("submit", function (ev) {
+      ev.preventDefault();
+      tBtn.disabled = true;
+      show("Saving...", "");
+      changeTemporaryPassword(window.fetch.bind(window), SUPABASE_URL, PUBLISHABLE_KEY,
+          $("tEmail").value.trim(), $("tCur").value, $("tPw1").value, $("tPw2").value).then(function (r) {
+        if (r.ok) {
+          tForm.hidden = true;
+          $("tempNote").hidden = true;
+          $("intro").hidden = true;
+          $("title").textContent = "Done";
+          $("tCur").value = ""; $("tPw1").value = ""; $("tPw2").value = "";
+          show(CHANGED_MSG, "ok");
+        } else {
+          tBtn.disabled = false;
+          show(r.message, "err");
+        }
+      });
+    });
+    return;
+  }
   if (c.state !== "ready") {
     $("intro").hidden = true;
     show(c.message, "err");

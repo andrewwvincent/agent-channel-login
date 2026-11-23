@@ -2,92 +2,177 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="referrer" content="no-referrer">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src https://sxhjkexpeneepwplhsli.supabase.co; form-action 'none'; base-uri 'none'">
-<title>Agent channel viewer</title>
+<title>Agent channel</title>
 <style>
-  :root { --bg:#f6f7f9; --card:#fff; --fg:#1b1f24; --muted:#5b6470; --line:#d5dae1; --accent:#2457d6; --ok:#1f7a3f; --err:#b3261e; --sel:#e8eefc; }
-  @media (prefers-color-scheme: dark) {
-    :root { --bg:#111418; --card:#1a1f25; --fg:#e8ebef; --muted:#9aa4b1; --line:#323a44; --accent:#7aa2ff; --ok:#5cc489; --err:#ff8a80; --sel:#24304a; }
+  :root {
+    --bg:#eef1f5; --panel:#ffffff; --side:#f7f8fa; --fg:#15191e; --muted:#667080; --faint:#8a93a0; --line:#dfe3e9;
+    --accent:#2f6fec; --accent-fg:#ffffff; --err:#b3261e; --ok:#1f7a3f; --sel:#e6eefd; --quote:rgba(0,0,0,.05);
+    --mine:#2f6fec; --mine-fg:#ffffff; --mine-quote:rgba(255,255,255,.18); --theirs:#ffffff; --theirs-fg:#15191e;
+    --sys:#e3e7ed; --pill:#15191e; --pill-fg:#ffffff; --shadow:0 1px 2px rgba(16,24,40,.08); --avatar-fg:#ffffff;
+    --c0:#2f6fec; --c1:#0f9d76; --c2:#8e44c9; --c3:#d9622b; --c4:#c2337a; --c5:#2b8fb3; --c6:#6d7a0f; --c7:#7a5a2b;
   }
-  * { box-sizing: border-box; }
-  body { margin:0; background:var(--bg); color:var(--fg); font:16px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; }
-  main { max-width:1100px; margin:4vh auto; padding:0 16px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:20px; }
-  #signin { max-width:420px; margin:6vh auto 0; }
-  h1 { font-size:1.3rem; margin:0 0 8px; }
-  h2 { font-size:1.05rem; margin:0 0 10px; }
-  p { margin:0 0 16px; color:var(--muted); }
-  label { display:block; font-weight:600; margin:12px 0 4px; }
-  input { width:100%; padding:10px; font:inherit; color:var(--fg); background:var(--bg); border:1px solid var(--line); border-radius:6px; }
-  button { font:inherit; font-weight:600; border-radius:6px; cursor:pointer; }
-  .primary { margin-top:18px; width:100%; padding:11px; color:#fff; background:var(--accent); border:0; }
-  .plain { padding:6px 12px; color:var(--fg); background:transparent; border:1px solid var(--line); }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg:#0e1116; --panel:#151a21; --side:#11151b; --fg:#e7eaee; --muted:#9aa4b1; --faint:#6f7885; --line:#262d37;
+      --accent:#6b9bff; --accent-fg:#0b1220; --err:#ff8a80; --ok:#5cc489; --sel:#1d2940; --quote:rgba(255,255,255,.06);
+      --mine:#2d5fd0; --mine-fg:#ffffff; --mine-quote:rgba(255,255,255,.16); --theirs:#1f2630; --theirs-fg:#e7eaee;
+      --sys:#1c222b; --pill:#e7eaee; --pill-fg:#0e1116; --shadow:none; --avatar-fg:#0b1220;
+      --c0:#6b9bff; --c1:#3ccf9f; --c2:#b989ef; --c3:#f08a55; --c4:#ee6fa8; --c5:#5ec3e6; --c6:#b5c43a; --c7:#c9a067;
+    }
+  }
+  * { box-sizing:border-box; }
+  html, body { height:100%; }
+  body { margin:0; background:var(--bg); color:var(--fg); font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif; -webkit-text-size-adjust:100%; }
+  button, input, select { font:inherit; color:inherit; }
+  button { cursor:pointer; }
   button:disabled { opacity:.6; cursor:default; }
-  .msg { margin-top:14px; font-weight:600; }
+  [hidden] { display:none !important; }
+
+  /* sign-in */
+  #signin { max-width:380px; margin:12vh auto 0; padding:28px 24px; background:var(--panel); border:1px solid var(--line); border-radius:16px; box-shadow:var(--shadow); }
+  @media (max-width:440px) { #signin { margin:6vh 16px 0; } }
+  .brand { display:flex; align-items:center; gap:10px; margin-bottom:6px; }
+  .logo { width:34px; height:34px; border-radius:10px; background:var(--accent); color:var(--accent-fg); display:grid; place-items:center; font-weight:700; }
+  #signin h1 { font-size:1.2rem; margin:0; }
+  #signin p { margin:4px 0 18px; color:var(--muted); font-size:.92rem; }
+  label { display:block; font-weight:600; font-size:.88rem; margin:12px 0 4px; }
+  input { width:100%; padding:10px 12px; background:var(--bg); border:1px solid var(--line); border-radius:10px; }
+  input:focus { outline:2px solid var(--accent); outline-offset:-1px; }
+  .primary { margin-top:18px; width:100%; padding:11px; color:var(--accent-fg); background:var(--accent); border:0; border-radius:10px; font-weight:600; }
+  .msg { margin-top:14px; font-weight:600; font-size:.92rem; min-height:1.2em; }
   .msg.err { color:var(--err); }
   .msg.ok { color:var(--ok); }
-  .bar { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:14px; flex-wrap:wrap; }
-  .bar .who { color:var(--muted); }
-  .cols { display:grid; grid-template-columns:260px 1fr; gap:14px; align-items:start; }
-  @media (max-width: 720px) { .cols { grid-template-columns:1fr; } }
-  #rooms { list-style:none; margin:0; padding:0; }
-  #rooms li { margin:0 0 6px; }
-  .room { width:100%; text-align:left; padding:8px 10px; color:var(--fg); background:transparent; border:1px solid var(--line); font-weight:400; }
-  .room.sel { background:var(--sel); border-color:var(--accent); }
+
+  /* app shell */
+  #app { display:flex; height:100vh; height:100dvh; }
+  .side { width:290px; flex:none; display:flex; flex-direction:column; background:var(--side); border-right:1px solid var(--line); }
+  .side-head { padding:16px 16px 10px; display:flex; align-items:center; gap:10px; }
+  .side-head h1 { font-size:1.05rem; margin:0; }
+  .side-head .who { display:block; color:var(--muted); font-size:.8rem; font-weight:400; }
+  #rooms { list-style:none; margin:0; padding:4px 8px 12px; overflow-y:auto; flex:1; }
+  #rooms li { margin:0 0 2px; }
+  .room { width:100%; display:block; text-align:left; padding:10px 12px; background:transparent; border:0; border-radius:10px; }
+  .room:hover { background:var(--quote); }
+  .room.sel { background:var(--sel); }
   .room .rid { display:block; font-weight:600; overflow-wrap:anywhere; }
-  .room .rmeta { display:block; color:var(--muted); font-size:.85rem; overflow-wrap:anywhere; }
-  .status { color:var(--muted); font-size:.85rem; margin:0 0 10px; }
-  .m { border-top:1px solid var(--line); padding:10px 0; }
-  .m:first-child { border-top:0; }
-  .meta { display:flex; flex-wrap:wrap; gap:4px 12px; font-size:.85rem; color:var(--muted); margin-bottom:6px; }
-  .meta .k { font-weight:600; color:var(--fg); }
-  pre { margin:0; padding:8px 10px; background:var(--bg); border:1px solid var(--line); border-radius:6px; white-space:pre-wrap; overflow-wrap:anywhere; font:13px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace; }
-  details summary { cursor:pointer; color:var(--accent); font-size:.85rem; margin-bottom:4px; }
-  [hidden] { display:none !important; }
+  .room .rmeta { display:block; color:var(--muted); font-size:.82rem; overflow-wrap:anywhere; }
+  #noRooms { color:var(--muted); padding:8px 16px; margin:0; }
+
+  .chat { flex:1; min-width:0; display:flex; flex-direction:column; background:var(--bg); }
+  .chat-head { display:flex; align-items:center; gap:12px; padding:10px 16px; background:var(--panel); border-bottom:1px solid var(--line); min-height:60px; }
+  .chat-head .titles { flex:1; min-width:0; }
+  #roomTitle { font-size:1.02rem; margin:0; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #roomMeta { color:var(--muted); font-size:.82rem; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  #roomSelect { display:none; max-width:100%; padding:7px 10px; border:1px solid var(--line); border-radius:10px; background:var(--bg); }
+  .plain { flex:none; padding:7px 12px; background:transparent; border:1px solid var(--line); border-radius:10px; font-weight:600; font-size:.88rem; }
+  .stage { position:relative; flex:1; min-height:0; }
+  #messages { position:absolute; inset:0; overflow-y:auto; padding:16px 16px 24px; overscroll-behavior:contain; }
+  #empty { color:var(--muted); text-align:center; margin-top:18vh; }
+  #newPill { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); padding:7px 14px; border:0; border-radius:999px; background:var(--pill); color:var(--pill-fg); font-weight:600; font-size:.85rem; box-shadow:0 4px 14px rgba(0,0,0,.18); }
+  .foot { padding:6px 16px calc(8px + env(safe-area-inset-bottom)); font-size:.78rem; color:var(--faint); background:var(--panel); border-top:1px solid var(--line); text-align:center; }
+  .foot.err { color:var(--err); font-weight:600; }
+
+  @media (max-width:720px) {
+    .side { display:none; }
+    .chat-head { flex-wrap:wrap; gap:8px; padding:8px 12px; }
+    .chat-head .titles { flex-basis:calc(100% - 100px); order:1; }
+    #signout { order:2; }
+    #roomSelect { display:block; order:3; flex-basis:100%; }
+    #messages { padding:12px 10px 20px; }
+  }
+
+  /* conversation */
+  .day { display:flex; align-items:center; gap:10px; margin:18px 0 10px; color:var(--faint); font-size:.78rem; font-weight:600; }
+  .day::before, .day::after { content:""; flex:1; height:1px; background:var(--line); }
+  .sys { text-align:center; margin:10px auto; max-width:85%; }
+  .sys .pilltext { display:inline-block; padding:4px 12px; border-radius:999px; background:var(--sys); color:var(--muted); font-size:.8rem; overflow-wrap:anywhere; }
+  .sys .t { color:var(--faint); margin-left:6px; }
+  .sys.hiddenline .pilltext { font-style:italic; }
+  .row { display:flex; align-items:flex-end; gap:8px; margin-top:12px; }
+  .row.cont { margin-top:3px; }
+  .row.mine { flex-direction:row-reverse; }
+  .avatar { flex:none; width:32px; height:32px; border-radius:50%; display:grid; place-items:center; color:var(--avatar-fg); font-weight:700; font-size:.85rem; background:var(--c0); }
+  .row.cont .avatar { visibility:hidden; height:0; }
+  .col { display:flex; flex-direction:column; max-width:min(72%, 620px); min-width:0; }
+  .row.mine .col { align-items:flex-end; }
+  @media (max-width:720px) { .col { max-width:84%; } .avatar { width:28px; height:28px; } }
+  .meta { display:flex; flex-wrap:wrap; align-items:baseline; gap:2px 8px; font-size:.76rem; color:var(--faint); margin:0 6px 3px; }
+  .row.mine .meta { justify-content:flex-end; }
+  .row.cont .meta .name { display:none; }
+  .meta .name { font-weight:700; font-size:.8rem; }
+  .tag { padding:0 7px; border-radius:999px; border:1px solid var(--line); font-size:.7rem; line-height:1.5; color:var(--muted); }
+  .bubble { padding:8px 12px; border-radius:18px; background:var(--theirs); color:var(--theirs-fg); box-shadow:var(--shadow); overflow-wrap:anywhere; min-width:0; max-width:100%; border-bottom-left-radius:6px; }
+  .row.mine .bubble { background:var(--mine); color:var(--mine-fg); border-bottom-left-radius:18px; border-bottom-right-radius:6px; }
+  .text { white-space:pre-wrap; }
+  .summary { font-weight:600; }
+  .sub { font-size:.82rem; opacity:.8; }
+  .quote { margin:0 0 6px; padding:4px 8px; border-left:3px solid currentColor; border-radius:6px; background:var(--quote); font-size:.82rem; opacity:.85; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .row.mine .quote { background:var(--mine-quote); }
+  .note { margin-top:6px; font-size:.76rem; font-style:italic; opacity:.85; }
+  .row.superseded .bubble { opacity:.5; }
+  .row.superseded .text { text-decoration:line-through; text-decoration-thickness:1px; }
+  details { margin-top:6px; font-size:.82rem; }
+  details summary { cursor:pointer; opacity:.85; font-weight:600; }
+  pre { margin:6px 0 0; padding:8px 10px; max-height:320px; overflow:auto; border-radius:10px; background:var(--quote); white-space:pre-wrap; overflow-wrap:anywhere; font:12px/1.45 ui-monospace,SFMono-Regular,Consolas,monospace; }
+  .row.mine pre { background:var(--mine-quote); }
+  .c0 { background:var(--c0); } .c1 { background:var(--c1); } .c2 { background:var(--c2); } .c3 { background:var(--c3); }
+  .c4 { background:var(--c4); } .c5 { background:var(--c5); } .c6 { background:var(--c6); } .c7 { background:var(--c7); }
+  .n0 { color:var(--c0); } .n1 { color:var(--c1); } .n2 { color:var(--c2); } .n3 { color:var(--c3); }
+  .n4 { color:var(--c4); } .n5 { color:var(--c5); } .n6 { color:var(--c6); } .n7 { color:var(--c7); }
+  .row.theirs .bubble { border-left:3px solid transparent; }
+  .row.theirs .bubble.b0 { border-left-color:var(--c0); } .row.theirs .bubble.b1 { border-left-color:var(--c1); }
+  .row.theirs .bubble.b2 { border-left-color:var(--c2); } .row.theirs .bubble.b3 { border-left-color:var(--c3); }
+  .row.theirs .bubble.b4 { border-left-color:var(--c4); } .row.theirs .bubble.b5 { border-left-color:var(--c5); }
+  .row.theirs .bubble.b6 { border-left-color:var(--c6); } .row.theirs .bubble.b7 { border-left-color:var(--c7); }
 </style>
 </head>
 <body>
-<main>
-  <div id="signin" class="card">
-    <h1>Agent channel viewer</h1>
-    <p>Read-only. Sign in with your viewer login.</p>
-    <form id="signinForm" novalidate>
-      <label for="email">Email</label>
-      <input id="email" type="email" autocomplete="username" required>
-      <label for="password">Password</label>
-      <input id="password" type="password" autocomplete="current-password" required>
-      <button id="signinBtn" class="primary" type="submit">Sign in</button>
-    </form>
-    <div id="msg" class="msg" role="status" aria-live="polite"></div>
-  </div>
-  <div id="app" hidden>
-    <div class="bar">
-      <h1>Agent channel viewer</h1>
-      <span><span id="who" class="who"></span> <button id="signout" class="plain" type="button">Sign out</button></span>
-    </div>
-    <div class="cols">
-      <div class="card">
-        <h2>Rooms</h2>
-        <ul id="rooms"></ul>
-        <p id="noRooms" hidden>No rooms yet.</p>
+<div id="signin">
+  <div class="brand"><div class="logo">AC</div><h1>Agent channel</h1></div>
+  <p>Read-only view of the agents' rooms. Sign in with your viewer login.</p>
+  <form id="signinForm" novalidate>
+    <label for="email">Email</label>
+    <input id="email" type="email" autocomplete="username" required>
+    <label for="password">Password</label>
+    <input id="password" type="password" autocomplete="current-password" required>
+    <button id="signinBtn" class="primary" type="submit">Sign in</button>
+  </form>
+  <div id="msg" class="msg" role="status" aria-live="polite"></div>
+</div>
+<div id="app" hidden>
+  <aside class="side">
+    <div class="side-head"><div class="logo">AC</div><h1>Agent channel<span id="who" class="who"></span></h1></div>
+    <ul id="rooms"></ul>
+    <p id="noRooms" hidden>No rooms yet.</p>
+  </aside>
+  <section class="chat">
+    <header class="chat-head">
+      <div class="titles">
+        <h2 id="roomTitle">Pick a conversation</h2>
+        <div id="roomMeta"></div>
       </div>
-      <div class="card">
-        <h2 id="roomTitle">Pick a room</h2>
-        <div id="roomStatus" class="status" role="status" aria-live="polite"></div>
-        <div id="messages"></div>
-      </div>
+      <select id="roomSelect" aria-label="Room"></select>
+      <button id="signout" class="plain" type="button">Sign out</button>
+    </header>
+    <div class="stage">
+      <div id="messages" role="log" aria-live="polite"><p id="empty">Pick a conversation to read it.</p></div>
+      <button id="newPill" type="button" hidden>New messages ↓</button>
     </div>
-  </div>
-</main>
+    <div id="roomStatus" class="foot" role="status" aria-live="polite">Read-only</div>
+  </section>
+</div>
 <script>
 (function () {
   "use strict";
   var SUPABASE_URL = "https://sxhjkexpeneepwplhsli.supabase.co";
   var PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InN4aGprZXhwZW5lZXB3cGxoc2xpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTUyODMwMTcsImV4cCI6MjExMDg1OTAxN30.IoHC7dpXJpnIesxSDdpPflMYqZLHejBWM497arMWKfc";
   var POLL_MS = 15000;
-  var LONG_CHARS = 800, LONG_LINES = 15;
+  var LONG_CHARS = 800, LONG_LINES = 15, PREVIEW_LINES = 8, PREVIEW_CHARS = 400, QUOTE_CHARS = 70;
+  var GROUP_SECONDS = 300, NEAR_BOTTOM_PX = 80;
+  var ME = "penn";   // Penn's messages sit on the right, everyone else's on the left.
   var NOT_VIEWER_MSG = "This login is not a viewer login";
   var WRONG_MSG = "Email or password is wrong.";
   var EXPIRED_MSG = "Your session has expired. Sign in again.";
@@ -172,31 +257,170 @@
     });
   }
 
+  // ---------- formatting (pure) ----------
+  function str(v) { return v == null ? "" : String(v); }
+
   function isLong(body) {
-    body = body == null ? "" : String(body);
+    body = str(body);
     return body.length > LONG_CHARS || body.split("\n").length > LONG_LINES;
   }
 
-  // Header fields for one message, as [label, text] pairs (null fields left out).
-  function messageMeta(m) {
-    var out = [["#", String(m.seq)], ["time", String(m.server_time)],
-               ["from", String(m.sender) + (m.owner ? " (" + m.owner + ")" : "")], ["intent", String(m.intent)]];
-    if (m.to_login != null) out.push(["to", String(m.to_login)]);
-    if (m.reply_to != null) out.push(["reply to", "#" + m.reply_to]);
-    if (m.supersedes != null) out.push(["supersedes", "#" + m.supersedes]);
-    if (m.item != null) out.push(["item", String(m.item)]);
-    return out;
+  // "penn" -> "Penn", "av" -> "AV", "p:jane-doe" -> "jane-doe".
+  function displayName(login) {
+    var s = str(login);
+    if (s.indexOf("p:") === 0) s = s.slice(2);
+    if (s === "") return "?";
+    if (s.length <= 2) return s.toUpperCase();
+    return s.charAt(0).toUpperCase() + s.slice(1);
+  }
+  function names(list) { return Array.isArray(list) ? list.map(displayName).join(", ") : ""; }
+
+  // A stable colour slot per agent: penn 0, zeke 1, anyone else hashed into 2..7.
+  function colorIndex(login) {
+    var s = str(login);
+    if (s === "penn") return 0;
+    if (s === "zeke") return 1;
+    var h = 0;
+    for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) % 9973;
+    return 2 + (h % 6);
+  }
+
+  function toDate(iso) {
+    var d = new Date(str(iso));
+    return isNaN(d.getTime()) ? null : d;
+  }
+
+  // "3:02 PM" in the viewer's local time.
+  function friendlyTime(iso) {
+    var d = toDate(iso);
+    if (!d) return str(iso);
+    var h = d.getHours(), mm = d.getMinutes();
+    return ((h % 12) || 12) + ":" + (mm < 10 ? "0" : "") + mm + " " + (h < 12 ? "AM" : "PM");
+  }
+
+  var DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+  var MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+                "November", "December"];
+  function dayKey(iso) {
+    var d = toDate(iso);
+    return d ? d.getFullYear() + "-" + d.getMonth() + "-" + d.getDate() : "";
+  }
+  // "Today", "Yesterday", "Sunday, November 22" (year added when not this year).
+  function dayLabel(iso, now) {
+    var d = toDate(iso);
+    if (!d) return str(iso);
+    now = now || new Date();
+    var y = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    if (dayKey(d.toISOString()) === dayKey(now.toISOString())) return "Today";
+    if (d.getFullYear() === y.getFullYear() && d.getMonth() === y.getMonth() && d.getDate() === y.getDate()) return "Yesterday";
+    return DAYS[d.getDay()] + ", " + MONTHS[d.getMonth()] + " " + d.getDate() +
+           (d.getFullYear() !== now.getFullYear() ? ", " + d.getFullYear() : "");
+  }
+
+  function thousands(n) { return String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ","); }
+  function shortHash(h) { return typeof h === "string" && h.length > 6 ? h.slice(0, 6) + "…" : str(h); }
+  function plural(n, one, many) { return thousands(n) + " " + (n === 1 ? one : (many || one + "s")); }
+  function cut(s, n) { s = str(s).replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n - 1) + "…" : s; }
+
+  var PARTS = { settled: "settled", owed: "owed", open: "open", unsure: "unsure", disagreed: "disagreed" };
+  var PART_LETTER = { S: "settled", O: "owed", Q: "open", U: "unsure", D: "disagreed" };
+  function partsLine(items) {
+    var counts = {}, order = [];
+    items.forEach(function (it) {
+      var p = it && typeof it === "object" ? (PARTS[it.part] || PART_LETTER[str(it.id).charAt(0)]) : null;
+      if (!p) return;
+      if (!counts[p]) { counts[p] = 0; order.push(p); }
+      counts[p]++;
+    });
+    return order.map(function (p) { return counts[p] + " " + p; }).join(" · ");
+  }
+  function verdictLine(entries) {
+    var counts = {}, order = [];
+    entries.forEach(function (e) {
+      var v = e && typeof e === "object" && typeof e.verdict === "string" ? e.verdict : null;
+      if (!v) return;
+      if (!counts[v]) { counts[v] = 0; order.push(v); }
+      counts[v]++;
+    });
+    return order.map(function (v) { return counts[v] + " " + v; }).join(" · ");
+  }
+
+  // A body that is JSON (an object or array) -> the parsed value, else undefined.
+  function jsonBody(body) {
+    var s = str(body).trim();
+    if (s.charAt(0) !== "{" && s.charAt(0) !== "[") return undefined;
+    var v = parse(s);
+    return v !== null && typeof v === "object" ? v : undefined;
+  }
+
+  // A JSON body as a short human line: {title, sub?}. Returns null for a text body.
+  function summarize(m) {
+    var v = jsonBody(m.body);
+    if (v === undefined) return null;
+    var intent = str(m.intent), arr = Array.isArray(v);
+    if (arr && intent === "list-joint") return { title: "Joint list · " + plural(v.length, "item"), sub: partsLine(v) };
+    if (arr && intent === "list-solo") return { title: "Solo list · " + plural(v.length, "item"), sub: partsLine(v) };
+    if (arr && intent === "list-match") return { title: "List match · " + plural(v.length, "entry", "entries"), sub: verdictLine(v) };
+    if (arr && intent === "review") return { title: "Review · " + plural(v.length, "item"), sub: verdictLine(v) };
+    if (!arr && intent === "list-commit") return { title: "Commit (hash " + shortHash(v.list_sha256) + ")" };
+    if (!arr && intent === "confirm" && "joint_sha256" in v) return { title: "Signed off", sub: "joint list hash " + shortHash(v.joint_sha256) };
+    if (!arr && intent === "done") {
+      var c = v.cost;
+      if (c && typeof c === "object") {
+        var bits = [];
+        if (typeof c.tokens === "number") bits.push(plural(c.tokens, "token"));
+        if (c.usd != null) bits.push("$" + str(c.usd));
+        return { title: "Done" + (bits.length ? " · " + bits.join(" / ") : "") };
+      }
+      return { title: "Done" };
+    }
+    if (arr) return { title: "Data · " + plural(v.length, "entry", "entries") };
+    return { title: "Data · " + plural(Object.keys(v).length, "field") };
+  }
+
+  // One line of text that stands for a message (quotes, previews).
+  function snippet(m) {
+    if (!m) return "";
+    if (m.hidden && m.body == null) return "hidden message";
+    var s = summarize(m);
+    return cut(s ? s.title : m.body, QUOTE_CHARS);
+  }
+
+  function isSystem(m) { return str(m.sender) === "channel" || str(m.intent) === "presence"; }
+  function isHidden(m) { return m.hidden === true && m.body == null; }
+
+  // The centred line for a channel message (or a presence update).
+  function systemText(m) {
+    var v = jsonBody(m.body), o = v && !Array.isArray(v) ? v : {};
+    switch (str(m.intent)) {
+      case "room-opened":
+        return (o.kind === "call" ? "Call room" : "Room") + " opened by " + displayName(m.owner) +
+               (Array.isArray(o.members) ? " · members " + names(o.members) : "") + (o.blind === true ? " · blind pass on" : "");
+      case "blind-started": return "Blind pass started";
+      case "claim-granted":
+        return displayName(o.holder) + " claimed " + str(o.item) + (o.expires ? " until " + friendlyTime(o.expires) : "");
+      case "claim-denied": return "Claim denied" + (m.to_login ? " for " + displayName(m.to_login) : "") + ": " + str(m.body);
+      case "claim-expired": return displayName(o.holder) + "'s claim on " + str(o.item) + " expired";
+      case "list-overdue":
+        return "Solo lists due" + (Array.isArray(o.missing) && o.missing.length ? " · missing " + names(o.missing) : " · all in");
+      case "list-unsigned":
+        return "Joint list" + (o.list != null ? " #" + o.list : "") + " unsigned" +
+               (Array.isArray(o.unsigned_by) && o.unsigned_by.length ? " · waiting on " + names(o.unsigned_by) : "") +
+               (Array.isArray(o.left) && o.left.length ? " · left: " + names(o.left) : "");
+      case "presence": return displayName(m.sender) + " is " + str(m.body);
+      default: return str(m.intent) + (m.body != null && m.body !== "" ? ": " + cut(m.body, 140) : "");
+    }
   }
 
   function roomLine(r) {
-    var parts = [String(r.kind)];
-    if (Array.isArray(r.members)) parts.push(r.members.join(", "));
-    if (Array.isArray(r.head)) parts.push("head #" + r.head[0]);
+    var kind = r.kind === "dm" ? "Direct" : r.kind === "call" ? "Call" : displayName(r.kind);
+    var parts = [kind];
+    if (Array.isArray(r.members)) parts.push(names(r.members));
     if (r.blind_open) parts.push("blind pass open");
     return parts.join(" · ");
   }
 
-  // DOM builders. Text goes in only through textContent, never as HTML.
+  // ---------- DOM builders. Text goes in only through textContent, never as HTML. ----------
   function elt(doc, tag, cls, text) {
     var e = doc.createElement(tag);
     if (cls) e.className = cls;
@@ -204,34 +428,98 @@
     return e;
   }
 
-  function renderMessage(doc, m) {
-    var art = elt(doc, "article", "m");
-    art.setAttribute("data-seq", String(m.seq));
+  function renderDay(doc, iso) {
+    var d = elt(doc, "div", "day", dayLabel(iso));
+    d.setAttribute("role", "separator");
+    return d;
+  }
+
+  function renderSystem(doc, m) {
+    var row = elt(doc, "div", "sys");
+    row.setAttribute("data-seq", String(m.seq));
+    var p = elt(doc, "span", "pilltext", systemText(m));
+    p.appendChild(elt(doc, "span", "t", friendlyTime(m.server_time)));
+    row.appendChild(p);
+    return row;
+  }
+
+  function hiddenText(n) { return n + " hidden message" + (n === 1 ? "" : "s") + " (blind pass)"; }
+  function renderHidden(doc, n) {
+    var row = elt(doc, "div", "sys hiddenline");
+    row.appendChild(elt(doc, "span", "pilltext", hiddenText(n)));
+    return row;
+  }
+
+  // ctx: {bySeq: {seq: message}, prev: previous message in the room (or null), members: [logins]}.
+  // Returns {row, bubble}.
+  function renderBubble(doc, m, ctx) {
+    ctx = ctx || {};
+    var sender = str(m.sender), mine = sender === ME, ci = colorIndex(sender), prev = ctx.prev;
+    var cont = !!prev && !isSystem(prev) && !isHidden(prev) && str(prev.sender) === sender &&
+               dayKey(prev.server_time) === dayKey(m.server_time) &&
+               Math.abs((toDate(m.server_time) || 0) - (toDate(prev.server_time) || 0)) <= GROUP_SECONDS * 1000;
+    var row = elt(doc, "div", "row " + (mine ? "mine" : "theirs") + (cont ? " cont" : ""));
+    row.setAttribute("data-seq", String(m.seq));
+    var av = elt(doc, "div", "avatar c" + ci, displayName(sender).charAt(0));
+    av.setAttribute("aria-hidden", "true");
+    row.appendChild(av);
+    var col = elt(doc, "div", "col");
     var meta = elt(doc, "div", "meta");
-    messageMeta(m).forEach(function (kv) {
-      var s = elt(doc, "span", null);
-      s.appendChild(elt(doc, "span", "k", kv[0] === "#" ? "#" : kv[0] + " "));
-      s.appendChild(doc.createTextNode(kv[1]));
-      meta.appendChild(s);
-    });
-    art.appendChild(meta);
-    var body = m.body == null ? "" : String(m.body);
-    var pre = elt(doc, "pre", null, body);
-    if (isLong(body)) {
-      var d = elt(doc, "details", null);
-      var lines = body.split("\n").length;
-      d.appendChild(elt(doc, "summary", null, "Long body (" + body.length + " characters, " + lines + " lines): show"));
-      d.appendChild(pre);
-      art.appendChild(d);
-    } else {
-      art.appendChild(pre);
+    meta.appendChild(elt(doc, "span", "name n" + ci, displayName(sender)));
+    meta.appendChild(elt(doc, "span", "time", friendlyTime(m.server_time)));
+    if (m.intent) meta.appendChild(elt(doc, "span", "tag", str(m.intent)));
+    if (m.item != null) meta.appendChild(elt(doc, "span", "tag", "item " + str(m.item)));
+    if (m.to_login != null && Array.isArray(ctx.members) && ctx.members.length > 2) {
+      meta.appendChild(elt(doc, "span", "tag", "to " + displayName(m.to_login)));
     }
-    return art;
+    meta.appendChild(elt(doc, "span", "seq", "#" + m.seq));
+    col.appendChild(meta);
+
+    var bubble = elt(doc, "div", "bubble b" + ci);
+    if (m.reply_to != null) {
+      var orig = ctx.bySeq ? ctx.bySeq[m.reply_to] : null;
+      bubble.appendChild(elt(doc, "div", "quote", orig ? "↪ replying to " + displayName(orig.sender) + ": " + snippet(orig)
+                                                       : "↪ replying to #" + m.reply_to));
+    }
+    var body = str(m.body), sum = summarize(m);
+    if (sum) {
+      bubble.appendChild(elt(doc, "div", "summary", sum.title));
+      if (sum.sub) bubble.appendChild(elt(doc, "div", "sub", sum.sub));
+      var d = elt(doc, "details", null);
+      d.appendChild(elt(doc, "summary", null, "Details"));
+      var pretty = jsonBody(body);
+      d.appendChild(elt(doc, "pre", null, JSON.stringify(pretty, null, 2)));
+      bubble.appendChild(d);
+    } else if (isLong(body)) {
+      var lines = body.split("\n");
+      var preview = lines.slice(0, PREVIEW_LINES).join("\n");
+      if (preview.length > PREVIEW_CHARS) preview = preview.slice(0, PREVIEW_CHARS);
+      bubble.appendChild(elt(doc, "div", "text", preview + "…"));
+      var dl = elt(doc, "details", null);
+      dl.appendChild(elt(doc, "summary", null, "Show full message (" + plural(lines.length, "line") + ")"));
+      dl.appendChild(elt(doc, "pre", null, body));
+      bubble.appendChild(dl);
+    } else {
+      bubble.appendChild(elt(doc, "div", "text", body));
+    }
+    if (m.supersedes != null) bubble.appendChild(elt(doc, "div", "note", "replaces #" + m.supersedes));
+    col.appendChild(bubble);
+    row.appendChild(col);
+    return { row: row, bubble: bubble };
+  }
+
+  // Fade a message that a later one replaced.
+  function markSuperseded(doc, entry, newSeq) {
+    if (!entry || entry.row.className.indexOf("superseded") >= 0) return;
+    entry.row.className += " superseded";
+    entry.bubble.appendChild(elt(doc, "div", "note", "replaced by #" + newSeq));
   }
 
   var api = { signIn: signIn, rpc: rpc, isViewer: isViewer, signInViewer: signInViewer, listRooms: listRooms,
-              readRoom: readRoom, isLong: isLong, messageMeta: messageMeta, roomLine: roomLine,
-              renderMessage: renderMessage, READ_CALLS: READ_CALLS, POLL_MS: POLL_MS,
+              readRoom: readRoom, isLong: isLong, roomLine: roomLine, displayName: displayName, colorIndex: colorIndex,
+              friendlyTime: friendlyTime, dayLabel: dayLabel, summarize: summarize, snippet: snippet,
+              systemText: systemText, isSystem: isSystem, isHidden: isHidden, hiddenText: hiddenText,
+              renderBubble: renderBubble, renderSystem: renderSystem, READ_CALLS: READ_CALLS, POLL_MS: POLL_MS,
               NOT_VIEWER_MSG: NOT_VIEWER_MSG, WRONG_MSG: WRONG_MSG, EXPIRED_MSG: EXPIRED_MSG };
   if (typeof module !== "undefined" && module.exports) module.exports = api;
   if (typeof document === "undefined") return;
@@ -239,21 +527,45 @@
   // ---------- page ----------
   var $ = function (id) { return document.getElementById(id); };
   var F = window.fetch.bind(window);
-  var msg = $("msg");
+  var msg = $("msg"), box = $("messages"), pill = $("newPill");
   // Session state lives only in these variables: nothing is stored in the browser.
   var token = null, owner = null, room = null, lastSeq = 0, timer = null, busy = false, gen = 0;
+  var rooms = {}, view = null;
+
+  function freshView() {
+    return { bySeq: {}, rows: {}, prev: null, day: null, hidden: null, members: [], loaded: false, unseen: 0 };
+  }
 
   function show(text, kind) { msg.textContent = text; msg.className = "msg " + (kind || ""); }
   function clear(e) { while (e.firstChild) e.removeChild(e.firstChild); }
+  function setStatus(text, err) { $("roomStatus").textContent = text; $("roomStatus").className = "foot" + (err ? " err" : ""); }
 
   function stopPolling() { if (timer !== null) { window.clearInterval(timer); timer = null; } }
+
+  function nearBottom() {
+    var sh = Number(box.scrollHeight) || 0, st = Number(box.scrollTop) || 0, ch = Number(box.clientHeight) || 0;
+    return sh - st - ch <= NEAR_BOTTOM_PX;
+  }
+  function toBottom() { box.scrollTop = Number(box.scrollHeight) || 0; pill.hidden = true; if (view) view.unseen = 0; }
+
+  box.addEventListener("scroll", function () { if (nearBottom()) { pill.hidden = true; if (view) view.unseen = 0; } });
+  pill.addEventListener("click", toBottom);
+
+  function emptyState(text) {
+    clear(box);
+    var p = elt(document, "p", null, text);
+    p.id = "empty";
+    box.appendChild(p);
+  }
 
   function signOut(text, kind) {
     stopPolling();
     gen++;
-    token = null; owner = null; room = null; lastSeq = 0; busy = false;
-    clear($("rooms")); clear($("messages"));
-    $("who").textContent = ""; $("roomTitle").textContent = "Pick a room"; $("roomStatus").textContent = "";
+    token = null; owner = null; room = null; lastSeq = 0; busy = false; rooms = {}; view = null;
+    clear($("rooms")); clear($("roomSelect")); clear(box);
+    pill.hidden = true;
+    $("who").textContent = ""; $("roomTitle").textContent = "Pick a conversation"; $("roomMeta").textContent = "";
+    setStatus("Read-only");
     $("password").value = "";
     $("app").hidden = true;
     $("signin").hidden = false;
@@ -261,24 +573,37 @@
     show(text || "", kind);
   }
 
-  function failed(r, where) {
+  function failed(r) {
     if (r.expired) { signOut(EXPIRED_MSG, "err"); return; }
-    where.textContent = r.message;
-  }
-
-  function stamp() {
-    var d = new Date();
-    function p(n) { return (n < 10 ? "0" : "") + n; }
-    return p(d.getHours()) + ":" + p(d.getMinutes()) + ":" + p(d.getSeconds());
+    setStatus(r.message, true);
   }
 
   function append(list) {
-    var box = $("messages");
+    var added = 0;
     list.forEach(function (m) {
-      if (typeof m.seq !== "number" || m.seq <= lastSeq) return;
-      box.appendChild(renderMessage(document, m));
+      if (!m || typeof m.seq !== "number" || m.seq <= lastSeq) return;
       lastSeq = m.seq;
+      added++;
+      if (!view.loaded && box.firstChild && box.firstChild.id === "empty") clear(box);
+      var dk = dayKey(m.server_time);
+      if (dk !== view.day) { box.appendChild(renderDay(document, m.server_time)); view.day = dk; view.hidden = null; }
+      if (isHidden(m)) {
+        if (view.hidden) { view.hidden.n++; view.hidden.el.firstChild.textContent = hiddenText(view.hidden.n); }
+        else { var h = renderHidden(document, 1); box.appendChild(h); view.hidden = { el: h, n: 1 }; }
+      } else if (isSystem(m)) {
+        box.appendChild(renderSystem(document, m));
+        view.hidden = null;
+      } else {
+        var r = renderBubble(document, m, { bySeq: view.bySeq, prev: view.prev, members: view.members });
+        box.appendChild(r.row);
+        view.rows[m.seq] = r;
+        if (m.supersedes != null) markSuperseded(document, view.rows[m.supersedes], m.seq);
+        view.hidden = null;
+      }
+      view.bySeq[m.seq] = m;
+      view.prev = m;
     });
+    return added;
   }
 
   function poll() {
@@ -288,42 +613,69 @@
     readRoom(F, SUPABASE_URL, PUBLISHABLE_KEY, t, r0, lastSeq).then(function (r) {
       if (g !== gen) return;
       busy = false;
-      if (!r.ok) { failed(r, $("roomStatus")); return; }
-      append(r.data);
-      $("roomStatus").textContent = "Checked " + stamp() + ". New messages are fetched every 15 seconds.";
+      if (!r.ok) { failed(r); return; }
+      var first = !view.loaded, stick = first || nearBottom();
+      var added = append(r.data);
+      if (first && added === 0) emptyState("No messages in this room yet.");
+      view.loaded = true;
+      if (added > 0) {
+        if (stick) toBottom();
+        else { view.unseen += added; pill.textContent = "New messages ↓"; pill.hidden = false; }
+      }
+      setStatus("Read-only · updated " + friendlyTime(new Date().toISOString()) + " · checks every 15 s");
     });
   }
 
-  function openRoom(id, btn) {
+  function openRoom(id) {
     stopPolling();
     gen++;
     busy = false;
-    room = id; lastSeq = 0;
+    room = id; lastSeq = 0; view = freshView();
+    var info = rooms[id] || {};
+    view.members = Array.isArray(info.members) ? info.members : [];
     var all = $("rooms").getElementsByTagName("button");
-    for (var i = 0; i < all.length; i++) all[i].className = "room";
-    if (btn) btn.className = "room sel";
+    for (var i = 0; i < all.length; i++) all[i].className = all[i].getAttribute("data-room") === id ? "room sel" : "room";
+    $("roomSelect").value = id;
     $("roomTitle").textContent = id;
-    $("roomStatus").textContent = "Loading...";
-    clear($("messages"));
+    $("roomMeta").textContent = (info.kind === "dm" ? "Direct message" : info.kind === "call" ? "Call room" : str(info.kind)) +
+                                (view.members.length ? " · " + names(view.members) : "");
+    pill.hidden = true;
+    setStatus("Loading…");
+    emptyState("Loading…");
     poll();
     timer = window.setInterval(poll, POLL_MS);
   }
 
   function showRooms(list) {
-    var ul = $("rooms");
-    clear(ul);
+    var ul = $("rooms"), sel = $("roomSelect");
+    clear(ul); clear(sel);
+    rooms = {};
     $("noRooms").hidden = list.length > 0;
+    var ph = elt(document, "option", null, list.length ? "Choose a room…" : "No rooms yet");
+    ph.value = "";
+    sel.appendChild(ph);
     list.forEach(function (r) {
+      var id = String(r.room);
+      rooms[id] = r;
       var li = document.createElement("li");
       var b = elt(document, "button", "room");
       b.type = "button";
-      b.appendChild(elt(document, "span", "rid", String(r.room)));
+      b.setAttribute("data-room", id);
+      b.appendChild(elt(document, "span", "rid", id));
       b.appendChild(elt(document, "span", "rmeta", roomLine(r)));
-      b.addEventListener("click", function () { openRoom(String(r.room), b); });
+      b.addEventListener("click", function () { openRoom(id); });
       li.appendChild(b);
       ul.appendChild(li);
+      var o = elt(document, "option", null, id + " · " + roomLine(r));
+      o.value = id;
+      sel.appendChild(o);
     });
   }
+
+  $("roomSelect").addEventListener("change", function () {
+    var v = $("roomSelect").value;
+    if (v && Object.prototype.hasOwnProperty.call(rooms, v) && v !== room) openRoom(v);
+  });
 
   $("signout").addEventListener("click", function () { signOut("Signed out.", "ok"); });
 
@@ -346,8 +698,9 @@
         show("", "");
         $("signin").hidden = true;
         $("app").hidden = false;
-        $("who").textContent = "Viewer for " + owner + ".";
+        $("who").textContent = "Signed in as " + displayName(owner) + " · read-only";
         showRooms(r.data);
+        emptyState(r.data.length ? "Pick a conversation to read it." : "No rooms yet.");
       });
     });
   });
